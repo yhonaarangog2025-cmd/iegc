@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego Clásico de la Culebra (Snake)</title>
+    <style>
+        /* Import a retro/arcade font for the aesthetic */
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+        
+        :root {
+            --bg-color: #1a1a1a;
+            --canvas-bg: #000;
+            --snake-color: #00ff00; /* Neon Green */
+            --food-color: #ff0077;  /* Neon Pink */
+            --grid-color: rgba(0, 255, 0, 0.1);
+            --text-color: #00ff00;
+            --shadow-color: #00ff00;
+        }
+
+        body {
+            font-family: 'VT323', monospace;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            background-color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            /* Strong neon shadow for retro effect */
+            box-shadow: 0 0 30px var(--shadow-color);
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            text-shadow: 0 0 8px var(--shadow-color);
+            margin-bottom: 10px;
+        }
+
+        #score-display {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        canvas {
+            border: 5px solid var(--shadow-color);
+            border-radius: 8px;
+            background-color: var(--canvas-bg);
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.5);
+            touch-action: none; /* Prevents zoom/scroll on mobile */
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .d-pad-vertical {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .d-pad-horizontal {
+            display: flex;
+            justify-content: center;
+        }
+
+        .control-button {
+            background-color: #008800;
+            color: #fff;
+            border: 3px solid var(--shadow-color);
+            padding: 15px;
+            margin: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+            border-radius: 8px;
+            box-shadow: 0 4px 0 #005500;
+            transition: all 0.1s ease;
+            width: 60px; /* Fixed size for d-pad */
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .control-button:active {
+            box-shadow: 0 1px 0 #005500;
+            transform: translateY(3px);
+            background-color: #00cc00;
+        }
+
+        .start-button {
+            background-color: var(--food-color);
+            color: var(--canvas-bg);
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.8em;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 5px 0 #aa0044;
+            transition: all 0.1s ease;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .start-button:active {
+            box-shadow: 0 2px 0 #aa0044;
+            transform: translateY(3px);
+            background-color: #ff3399;
+        }
+
+        #message-box {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .message-content {
+            background-color: var(--bg-color);
+            padding: 30px;
+            border-radius: 10px;
+            border: 5px solid var(--food-color);
+            box-shadow: 0 0 20px var(--food-color);
+            text-align: center;
+        }
+
+        .message-content h2 {
+            font-size: 3em;
+            color: var(--food-color);
+            margin-top: 0;
+            text-shadow: 0 0 5px #ff0077;
+        }
+
+        .message-content p {
+            font-size: 1.5em;
+        }
+
+        /* Hide controls on desktop, rely on keyboard */
+        @media (min-width: 768px) {
+            .controls {
+                display: none; 
+            }
+        }
+        /* Make canvas responsive on mobile */
+        @media (max-width: 767px) {
+            .game-container {
+                padding: 10px;
+            }
+            canvas {
+                width: 95vw;
+                height: 95vw;
+                max-width: 400px;
+                max-height: 400px;
+            }
+            .controls {
+                display: flex; /* Show on mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>JUEGO DE LA CULEBRA</h1>
+        <div id="score-display">Puntuación: <span id="score">0</span></div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        
+        <button id="startButton" class="start-button">Comenzar Juego</button>
+
+        <!-- Controles D-Pad para móvil -->
+        <div class="controls">
+            <h2>Controles Táctiles:</h2>
+            <div class="d-pad-vertical">
+                <button class="control-button" data-dir="UP">▲</button>
+            </div>
+            <div class="d-pad-horizontal">
+                <button class="control-button" data-dir="LEFT">◀</button>
+                <div style="width: 70px;"></div> <!-- Espaciador -->
+                <button class="control-button" data-dir="RIGHT">▶</button>
+            </div>
+            <div class="d-pad-vertical">
+                <button class="control-button" data-dir="DOWN">▼</button>
+            </div>
+            <p class="mt-4 text-xs text-gray-400">Teclado: Flechas o W, A, S, D</p>
+        </div>
+
+    </div>
+
+    <!-- Mensaje de Juego Terminado -->
+    <div id="message-box">
+        <div class="message-content">
+            <h2 id="message-title">¡Juego Terminado!</h2>
+            <p id="final-score">Puntuación Final: 0</p>
+            <button class="start-button" onclick="hideMessage(); resetGame();">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Configuration
+        const CANVAS_SIZE = 400;
+        const GRID_SIZE = 20; // 20x20 grid
+        const TILE_SIZE = CANVAS_SIZE / GRID_SIZE;
+        let gameInterval;
+        let gameSpeed = 150; // Initial speed (ms)
+
+        // Game state variables
+        // Se inicializan a null para evitar el error de TypeError al cargar la página.
+        let snake = null; 
+        let food = null;  
+        let direction; // 'RIGHT', 'LEFT', 'UP', 'DOWN'
+        let score;
+        let isGameOver = false;
+
+        // DOM Elements
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const startButton = document.getElementById('startButton');
+        const messageBox = document.getElementById('message-box');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const controlButtons = document.querySelectorAll('.control-button');
+
+        // --- Utility Functions ---
+
+        /**
+         * Generates a random position within the grid.
+         */
+        function getRandomPosition() {
+            return {
+                x: Math.floor(Math.random() * GRID_SIZE),
+                y: Math.floor(Math.random() * GRID_SIZE)
+            };
+        }
+
+        /**
+         * Draws a tile at the grid position.
+         */
+        function drawTile(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+
+        // --- Game Logic ---
+
+        function initGame() {
+            // Initialize game state with proper values
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 }
+            ];
+            direction = 'RIGHT';
+            score = 0;
+            isGameOver = false;
+            
+            // Ensure food is not on the snake
+            do {
+                food = getRandomPosition();
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+
+            scoreDisplay.textContent = score;
+            startButton.textContent = 'Reiniciar Juego';
+            gameSpeed = 150;
+            hideMessage();
+
+            // Stop any previous interval and start a new one
+            if (gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(gameLoop, gameSpeed);
+        }
+
+        function updateGame() {
+            if (isGameOver) return;
+
+            // 1. Move the snake (Create the new head)
+            const head = { x: snake[0].x, y: snake[0].y };
+
+            switch (direction) {
+                case 'RIGHT': head.x++; break;
+                case 'LEFT': head.x--; break;
+                case 'UP': head.y--; break;
+                case 'DOWN': head.y++; break;
+            }
+
+            // 2. Check Collisions
+            
+            // Wall collision
+            if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+                gameOver();
+                return;
+            }
+
+            // Self collision
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    gameOver();
+                    return;
+                }
+            }
+            
+            // Insert the new head
+            snake.unshift(head);
+
+
+            // 3. Check if food is eaten
+            if (head.x === food.x && head.y === food.y) {
+                score++;
+                scoreDisplay.textContent = score;
+                
+                // Generate new food, ensuring it's not on the snake
+                do {
+                    food = getRandomPosition();
+                } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+                
+                // Increase speed every 5 points (min speed 50ms)
+                if (score % 5 === 0 && gameSpeed > 50) {
+                    gameSpeed -= 10;
+                    clearInterval(gameInterval);
+                    gameInterval = setInterval(gameLoop, gameSpeed);
+                }
+
+            } else {
+                // If not eaten, remove the tail (move the snake)
+                snake.pop();
+            }
+
+            drawGame();
+        }
+
+        function drawGame() {
+            // Clear the canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            
+            // Draw the food (a tile) - Check if food object is initialized
+            if (food) {
+                drawTile(food.x, food.y, 'var(--food-color)');
+            }
+            
+            // Draw the snake - Check if snake array is initialized
+            if (snake) {
+                snake.forEach((segment, index) => {
+                    // Head is brighter
+                    const color = index === 0 ? 'var(--snake-color)' : 'rgba(0, 255, 0, 0.8)';
+                    drawTile(segment.x, segment.y, color);
+                });
+            }
+        }
+
+        function gameLoop() {
+            updateGame();
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            clearInterval(gameInterval);
+            
+            finalScoreDisplay.textContent = `Puntuación Final: ${score}`;
+            showMessage();
+        }
+        
+        function showMessage() {
+            messageBox.style.display = 'flex';
+        }
+
+        function hideMessage() {
+            messageBox.style.display = 'none';
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        // --- Input Handling ---
+
+        // Variable to prevent immediate direction changes within the same game tick
+        let isChangingDirection = false;
+
+        function setDirection(newDirection) {
+            if (isChangingDirection || isGameOver) return;
+            // Si snake es null, el juego no ha comenzado, ignorar la entrada.
+            if (!snake) return; 
+
+            // Prevent reverse movement (e.g., UP -> DOWN)
+            const isOpposite = (direction === 'UP' && newDirection === 'DOWN') ||
+                               (direction === 'DOWN' && newDirection === 'UP') ||
+                               (direction === 'LEFT' && newDirection === 'RIGHT') ||
+                               (direction === 'RIGHT' && newDirection === 'LEFT');
+
+            if (!isOpposite) {
+                direction = newDirection;
+                isChangingDirection = true;
+            }
+        }
+
+        // Reset direction change flag after a game cycle
+        function resetDirectionFlag() {
+            isChangingDirection = false;
+        }
+        
+        // Overwrite gameLoop to include the flag reset
+        const originalGameLoop = gameLoop;
+        gameLoop = function() {
+            originalGameLoop();
+            resetDirectionFlag();
+        };
+
+        // Keyboard handling (W, A, S, D and Arrow Keys)
+        document.addEventListener('keydown', (e) => {
+            if (isGameOver) return;
+            // Permite que el usuario comience el juego con una tecla de dirección si aún no ha comenzado
+            if (!snake && startButton.textContent === 'Comenzar Juego') {
+                initGame();
+            }
+
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                    setDirection('UP');
+                    break;
+                case 'ArrowDown':
+                case 's':
+                    setDirection('DOWN');
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                    setDirection('LEFT');
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                    setDirection('RIGHT');
+                    break;
+            }
+        });
+
+        // Button handling (D-Pad)
+        controlButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                if (isGameOver) return;
+                // Permite comenzar el juego tocando el D-Pad
+                if (!snake) {
+                    initGame();
+                }
+                const newDirection = e.currentTarget.dataset.dir;
+                setDirection(newDirection);
+            });
+        });
+
+        // Start/Restart Button
+        startButton.addEventListener('click', initGame);
+
+        // Initialize canvas on page load
+        window.onload = function() {
+            canvas.width = CANVAS_SIZE;
+            canvas.height = CANVAS_SIZE;
+            drawGame(); // Dibuja el fondo negro, sin errores.
+        };
+        
+    </script>
+</body>
+</html>
